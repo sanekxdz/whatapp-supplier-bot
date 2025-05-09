@@ -88,55 +88,31 @@ function generateProductVariants(product) {
 
 export const parseOrder = (text) => {
   try {
-    // Разбиваем текст на строки
-    const lines = text.split(/[\n,]+/).map(line => line.trim()).filter(Boolean);
+    // Разбиваем текст на строки и обрабатываем дефисы
+    const lines = text
+      .replace(/-/g, ' ') // Заменяем дефисы на пробелы
+      .split(/[\n,]+/)
+      .map(line => line.trim())
+      .filter(Boolean);
     
     // Массив для хранения обработанных позиций
     const parsedItems = [];
     
-    // Временные переменные для хранения текущего товара и его количества
-    let currentItem = null;
-    let currentQuantity = null;
-    
     for (const line of lines) {
-      // Проверяем, содержит ли строка количество
-      const hasQuantity = /\d+(\.\d+)?\s*(кг|шт|г|л|мл)/.test(line);
-      
-      if (hasQuantity) {
-        // Если это строка с количеством и у нас есть предыдущий товар без количества
-        if (currentItem && !currentQuantity) {
-          parsedItems.push(`${currentItem} ${line}`);
-          currentItem = null;
-          currentQuantity = null;
-        } else {
-          // Если это просто строка с количеством, сохраняем ее
-          currentQuantity = line;
-        }
-      } else {
-        // Если это название товара
-        if (currentQuantity) {
-          // Если у нас есть сохраненное количество, объединяем с текущим товаром
-          parsedItems.push(`${line} ${currentQuantity}`);
-          currentItem = null;
-          currentQuantity = null;
-        } else {
-          // Если это просто название товара, сохраняем его
-          if (currentItem) {
-            // Если у нас уже есть сохраненный товар, добавляем его как есть
-            parsedItems.push(currentItem);
-          }
-          currentItem = line;
+      // Ищем количество в строке
+      const quantityMatch = line.match(/(\d+(?:\.\d+)?)\s*(кг|шт|г|л|мл)/i);
+      if (quantityMatch) {
+        const [_, amount, unit] = quantityMatch;
+        // Получаем название продукта, убирая количество
+        const productName = line
+          .replace(quantityMatch[0], '')
+          .trim()
+          .replace(/\s+/g, ' '); // Убираем лишние пробелы
+        
+        if (productName) {
+          parsedItems.push(`${productName} ${amount} ${unit}`);
         }
       }
-    }
-    
-    // Обрабатываем оставшиеся данные
-    if (currentItem && currentQuantity) {
-      parsedItems.push(`${currentItem} ${currentQuantity}`);
-    } else if (currentItem) {
-      parsedItems.push(currentItem);
-    } else if (currentQuantity) {
-      parsedItems.push(currentQuantity);
     }
     
     return parsedItems;

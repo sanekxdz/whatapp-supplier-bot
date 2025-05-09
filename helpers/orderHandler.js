@@ -4,6 +4,21 @@ import { readFileSync } from 'fs';
 
 const employees = JSON.parse(readFileSync('./db/employees.json', 'utf-8'));
 
+// Функция для проверки соответствия продукта
+function findMatchingSupplier(product, suppliers) {
+  const normalizedProduct = product.toLowerCase().trim();
+  
+  for (const [supplierName, supplier] of Object.entries(suppliers)) {
+    for (const supplierProduct of supplier.products) {
+      if (normalizedProduct.includes(supplierProduct.toLowerCase()) || 
+          supplierProduct.toLowerCase().includes(normalizedProduct)) {
+        return supplierName;
+      }
+    }
+  }
+  return null;
+}
+
 export const handleOrder = async (sock, from, text, session, suppliers, ownerNumber) => {
   try {
     // Получаем информацию об отправителе
@@ -27,6 +42,34 @@ _название количество_
       });
       return { orderId: null, order: null };
     }
+
+    // Проверяем каждый продукт на соответствие поставщикам
+    const matchedItems = [];
+    const unmatchedItems = [];
+    
+    for (const item of items) {
+      const productName = item.split(/\d/)[0].trim();
+      const supplier = findMatchingSupplier(productName, suppliers);
+      
+      if (supplier) {
+        matchedItems.push(item);
+      } else {
+        unmatchedItems.push(item);
+      }
+    }
+
+    // Если есть несоответствующие продукты, отправляем предупреждение
+    if (unmatchedItems.length > 0) {
+      await sock.sendMessage(from, {
+        text: `⚠️ *Внимание!*
+
+Следующие продукты не найдены в базе данных поставщиков:
+${unmatchedItems.map(item => `• ${item}`).join('\n')}
+
+Пожалуйста, проверьте названия продуктов и попробуйте снова.`
+      });
+      return { orderId: null, order: null };
+    }
     
     // Создаем объект заказа
     const orderId = uuidv4();
@@ -34,7 +77,7 @@ _название количество_
       id: orderId,
       location: session.location,
       datetime: session.datetime,
-      items: items,
+      items: matchedItems,
       status: 'pending',
       sender: {
         name: senderName,
