@@ -6,6 +6,8 @@ import { handleOrder } from './helpers/orderHandler.js';
 import { handleAdminCommand } from './helpers/adminHandler.js';
 import { handleOrderCancellation, handleOrderEdit } from './helpers/orderManagement.js';
 import { handleSupplierFeedback } from './helpers/supplierFeedback.js';
+import crypto from 'crypto';
+globalThis.crypto = crypto;
 
 const suppliers = JSON.parse(readFileSync('./db/suppliers.json', 'utf-8'));
 const locations = JSON.parse(readFileSync('./db/locations.json', 'utf-8'));
