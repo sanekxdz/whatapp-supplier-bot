@@ -19,12 +19,26 @@ function findMatchingSupplier(product, suppliers) {
   return null;
 }
 
+// Функция для получения имени отправителя
+async function getSenderName(sock, from, senderPhone) {
+  try {
+    const employee = employees[senderPhone];
+    if (employee) {
+      return employee.name;
+    }
+    const status = await sock.fetchStatus(from);
+    return status?.status || 'Неизвестный отправитель';
+  } catch (error) {
+    console.error('Error getting sender name:', error);
+    return 'Неизвестный отправитель';
+  }
+}
+
 export const handleOrder = async (sock, from, text, session, suppliers, ownerNumber) => {
   try {
     // Получаем информацию об отправителе
     const senderPhone = from.split('@')[0];
-    const employee = employees[senderPhone];
-    const senderName = employee ? employee.name : (await sock.fetchStatus(from))?.status || 'Неизвестный отправитель';
+    const senderName = await getSenderName(sock, from, senderPhone);
 
     // Парсим заказ
     const items = parseOrder(text);
