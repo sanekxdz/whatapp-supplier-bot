@@ -1,3 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+
+// Читаем данные о поставщиках
+const suppliersPath = path.join(__dirname, '../db/suppliers.json');
+const suppliers = JSON.parse(fs.readFileSync(suppliersPath, 'utf8'));
+
 // Функция для вычисления расстояния Левенштейна
 function levenshteinDistance(a, b) {
   if (a.length === 0) return b.length;
@@ -46,12 +53,31 @@ export function isSimilar(word1, word2) {
 
 // Функция для нормализации текста
 function normalizeText(text) {
-  return text
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/[^а-яa-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+    return text.toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Функция для поиска продукта у поставщиков
+function findProductInSuppliers(productName) {
+    const normalizedProduct = normalizeText(productName);
+    
+    for (const supplier of suppliers) {
+        const foundProduct = supplier.products.find(p => 
+            normalizeText(p).includes(normalizedProduct) || 
+            normalizedProduct.includes(normalizeText(p))
+        );
+        
+        if (foundProduct) {
+            return {
+                supplier,
+                product: foundProduct
+            };
+        }
+    }
+    
+    return null;
 }
 
 // Функция для создания вариантов написания продукта
@@ -86,52 +112,52 @@ function generateProductVariants(product) {
   return [...new Set(variants)]; // Удаляем дубликаты
 }
 
-export const parseOrder = (text) => {
-  try {
-    console.log('📝 Начало парсинга текста:', text);
+// Функция для парсинга заказа
+function parseOrder(orderText) {
+    console.log('Начало парсинга заказа:', orderText);
     
-    // Разбиваем текст на строки и обрабатываем дефисы
-    const lines = text
-      .replace(/-/g, ' ') // Заменяем дефисы на пробелы
-      .split(/[\n,]+/)
-      .map(line => line.trim())
-      .filter(Boolean);
+    // Разбиваем текст на строки
+    const lines = orderText.split('\n').map(line => line.trim()).filter(line => line);
+    console.log('Разбитые строки:', lines);
     
-    console.log('📋 Разбитые строки:', lines);
-    
-    // Массив для хранения обработанных позиций
-    const parsedItems = [];
+    const orders = [];
     
     for (const line of lines) {
-      console.log('🔍 Обработка строки:', line);
-      
-      // Ищем количество в строке
-      const quantityMatch = line.match(/(\d+(?:\.\d+)?)\s*(кг|шт|г|л|мл)/i);
-      if (quantityMatch) {
-        const [_, amount, unit] = quantityMatch;
-        console.log('📊 Найдено количество:', amount, unit);
-        
-        // Получаем название продукта, убирая количество
-        const productName = line
-          .replace(quantityMatch[0], '')
-          .trim()
-          .replace(/\s+/g, ' '); // Убираем лишние пробелы
-        
-        console.log('📦 Название продукта:', productName);
-        
-        if (productName) {
-          parsedItems.push(`${productName} ${amount} ${unit}`);
+        // Ищем количество (число перед кг или шт)
+        const quantityMatch = line.match(/(\d+)\s*(кг|шт)/i);
+        if (!quantityMatch) {
+            console.log('Не найдено количество в строке:', line);
+            continue;
         }
-      } else {
-        console.log('⚠️ Не найдено количество в строке:', line);
-      }
+        
+        const quantity = parseInt(quantityMatch[1]);
+        const unit = quantityMatch[2].toLowerCase();
+        
+        // Получаем название продукта (всё до количества)
+        const productName = line.substring(0, quantityMatch.index).trim();
+        console.log('Найден продукт:', productName, 'количество:', quantity, unit);
+        
+        // Ищем продукт у поставщиков
+        const productInfo = findProductInSuppliers(productName);
+        if (!productInfo) {
+            console.log('Продукт не найден у поставщиков:', productName);
+            continue;
+        }
+        
+        orders.push({
+            product: productInfo.product,
+            quantity,
+            unit,
+            supplier: productInfo.supplier,
+            originalText: line
+        });
     }
     
-    console.log('✅ Результат парсинга:', parsedItems);
-    return parsedItems;
-  } catch (error) {
-    console.error('❌ Ошибка при парсинге заказа:', error);
-    console.error('Stack trace:', error.stack);
-    return null;
-  }
+    console.log('Результат парсинга:', orders);
+    return orders;
+}
+
+module.exports = {
+    parseOrder,
+    findProductInSuppliers
 };
