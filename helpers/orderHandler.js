@@ -7,7 +7,6 @@ const employees = JSON.parse(readFileSync('./db/employees.json', 'utf-8'));
 // Функция для проверки соответствия продукта
 function findMatchingSupplier(product, suppliers) {
   console.log('🔍 Поиск поставщика для продукта:', product);
-  console.log('📦 Доступные поставщики:', JSON.stringify(suppliers, null, 2));
   
   const normalizedProduct = product.toLowerCase().trim();
   console.log('📝 Нормализованное название продукта:', normalizedProduct);
@@ -15,9 +14,13 @@ function findMatchingSupplier(product, suppliers) {
   for (const supplier of suppliers) {
     console.log('🔎 Проверка поставщика:', supplier.name);
     for (const supplierProduct of supplier.products) {
-      console.log('📦 Проверка продукта поставщика:', supplierProduct);
-      if (normalizedProduct.includes(supplierProduct.toLowerCase()) || 
-          supplierProduct.toLowerCase().includes(normalizedProduct)) {
+      const normalizedSupplierProduct = supplierProduct.toLowerCase().trim();
+      console.log('📦 Проверка продукта поставщика:', normalizedSupplierProduct);
+      
+      // Проверяем точное совпадение или включение
+      if (normalizedProduct === normalizedSupplierProduct || 
+          normalizedProduct.includes(normalizedSupplierProduct) || 
+          normalizedSupplierProduct.includes(normalizedProduct)) {
         console.log('✅ Найден подходящий поставщик:', supplier.name);
         return supplier.name;
       }
@@ -68,8 +71,10 @@ _название количество_
     console.log('🔍 Начало проверки продуктов');
     for (const item of items) {
       console.log('📦 Проверка товара:', item);
+      // Извлекаем название продукта до первого числа
       const productName = item.split(/\d/)[0].trim();
       console.log('📝 Название продукта:', productName);
+      
       const supplier = findMatchingSupplier(productName, suppliers);
       
       if (supplier) {

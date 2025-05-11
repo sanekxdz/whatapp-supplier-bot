@@ -88,6 +88,8 @@ function generateProductVariants(product) {
 
 export const parseOrder = (text) => {
   try {
+    console.log('📝 Начало парсинга текста:', text);
+    
     // Разбиваем текст на строки и обрабатываем дефисы
     const lines = text
       .replace(/-/g, ' ') // Заменяем дефисы на пробелы
@@ -95,29 +97,41 @@ export const parseOrder = (text) => {
       .map(line => line.trim())
       .filter(Boolean);
     
+    console.log('📋 Разбитые строки:', lines);
+    
     // Массив для хранения обработанных позиций
     const parsedItems = [];
     
     for (const line of lines) {
+      console.log('🔍 Обработка строки:', line);
+      
       // Ищем количество в строке
       const quantityMatch = line.match(/(\d+(?:\.\d+)?)\s*(кг|шт|г|л|мл)/i);
       if (quantityMatch) {
         const [_, amount, unit] = quantityMatch;
+        console.log('📊 Найдено количество:', amount, unit);
+        
         // Получаем название продукта, убирая количество
         const productName = line
           .replace(quantityMatch[0], '')
           .trim()
           .replace(/\s+/g, ' '); // Убираем лишние пробелы
         
+        console.log('📦 Название продукта:', productName);
+        
         if (productName) {
           parsedItems.push(`${productName} ${amount} ${unit}`);
         }
+      } else {
+        console.log('⚠️ Не найдено количество в строке:', line);
       }
     }
     
+    console.log('✅ Результат парсинга:', parsedItems);
     return parsedItems;
   } catch (error) {
-    console.error('Error parsing order:', error);
+    console.error('❌ Ошибка при парсинге заказа:', error);
+    console.error('Stack trace:', error.stack);
     return null;
   }
 };
