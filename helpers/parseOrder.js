@@ -31,7 +31,7 @@ function levenshteinDistance(a, b) {
 }
 
 // Функция для проверки схожести слов
-function isSimilar(word1, word2) {
+export function isSimilar(word1, word2) {
   // Если одно слово является подстрокой другого, считаем их похожими
   if (word1.includes(word2) || word2.includes(word1)) {
     return true;

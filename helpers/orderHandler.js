@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { parseOrder } from './parseOrder.js';
+import { parseOrder, isSimilar } from './parseOrder.js';
 import { readFileSync } from 'fs';
 
 const employees = JSON.parse(readFileSync('./db/employees.json', 'utf-8'));
@@ -17,10 +17,8 @@ function findMatchingSupplier(product, suppliers) {
       const normalizedSupplierProduct = supplierProduct.toLowerCase().trim();
       console.log('📦 Проверка продукта поставщика:', normalizedSupplierProduct);
       
-      // Проверяем точное совпадение или включение
-      if (normalizedProduct === normalizedSupplierProduct || 
-          normalizedProduct.includes(normalizedSupplierProduct) || 
-          normalizedSupplierProduct.includes(normalizedProduct)) {
+      // Используем функцию isSimilar для более гибкого сравнения
+      if (isSimilar(normalizedProduct, normalizedSupplierProduct)) {
         console.log('✅ Найден подходящий поставщик:', supplier.name);
         return supplier.name;
       }
