@@ -140,10 +140,16 @@ _Формат: Название продукта количество_
           }
 
           if (session.step === 2) {
-            const { orderId, order } = await handleOrder(sock, from, text, session, suppliers, ownerNumber);
-            if (orderId && order) {
-              pendingOrders[orderId] = order;
+            try {
+              await handleOrder({ from, body: text }, sock);
               delete sessions[from];
+            } catch (error) {
+              console.error('Ошибка при обработке заказа:', error);
+              await sock.sendMessage(from, { 
+                text: `❌ *Произошла ошибка при обработке заказа*
+
+Пожалуйста, попробуйте еще раз или обратитесь к администратору.` 
+              });
             }
           }
         } catch (error) {
