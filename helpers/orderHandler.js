@@ -1,11 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
-import { parseOrder, isSimilar } from './parseOrder.js';
-import { readFileSync } from 'fs';
+import { parseOrder, findProductInSuppliers } from './parseOrder.js';
+import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Читаем данные о сотрудниках
 const employeesPath = path.join(__dirname, '../db/employees.json');
-const employees = JSON.parse(readFileSync(employeesPath, 'utf8'));
+const employees = JSON.parse(fs.readFileSync(employeesPath, 'utf8'));
 
 // Функция для проверки соответствия продукта
 function findMatchingSupplier(product, suppliers) {
@@ -32,7 +36,7 @@ function findMatchingSupplier(product, suppliers) {
 }
 
 // Функция для обработки заказа
-async function handleOrder(message, client) {
+export async function handleOrder(message, client) {
     try {
         console.log('Начало обработки заказа:', message.body);
         

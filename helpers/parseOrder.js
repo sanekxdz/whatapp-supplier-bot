@@ -1,5 +1,9 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Читаем данные о поставщиках
 const suppliersPath = path.join(__dirname, '../db/suppliers.json');
@@ -118,7 +122,7 @@ function generateProductVariants(product) {
 }
 
 // Функция для парсинга заказа
-function parseOrder(orderText) {
+export function parseOrder(orderText) {
     console.log('Начало парсинга заказа:', orderText);
     
     // Разбиваем текст на строки и удаляем дубликаты
@@ -177,7 +181,4 @@ function parseOrder(orderText) {
     return orders;
 }
 
-module.exports = {
-    parseOrder,
-    findProductInSuppliers
-};
+export { findProductInSuppliers };
