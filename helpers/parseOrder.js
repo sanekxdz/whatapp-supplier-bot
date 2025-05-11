@@ -62,21 +62,26 @@ function normalizeText(text) {
 // Функция для поиска продукта у поставщиков
 function findProductInSuppliers(productName) {
     const normalizedProduct = normalizeText(productName);
+    console.log('Поиск продукта:', normalizedProduct);
     
     for (const supplier of suppliers) {
-        const foundProduct = supplier.products.find(p => 
-            normalizeText(p).includes(normalizedProduct) || 
-            normalizedProduct.includes(normalizeText(p))
-        );
-        
-        if (foundProduct) {
-            return {
-                supplier,
-                product: foundProduct
-            };
+        console.log('Проверка поставщика:', supplier.name);
+        for (const supplierProduct of supplier.products) {
+            const normalizedSupplierProduct = normalizeText(supplierProduct);
+            console.log('Сравнение с:', normalizedSupplierProduct);
+            
+            if (normalizedSupplierProduct.includes(normalizedProduct) || 
+                normalizedProduct.includes(normalizedSupplierProduct)) {
+                console.log('Найдено совпадение!');
+                return {
+                    supplier,
+                    product: supplierProduct
+                };
+            }
         }
     }
     
+    console.log('Продукт не найден');
     return null;
 }
 
@@ -116,11 +121,15 @@ function generateProductVariants(product) {
 function parseOrder(orderText) {
     console.log('Начало парсинга заказа:', orderText);
     
-    // Разбиваем текст на строки
-    const lines = orderText.split('\n').map(line => line.trim()).filter(line => line);
-    console.log('Разбитые строки:', lines);
+    // Разбиваем текст на строки и удаляем дубликаты
+    const lines = [...new Set(orderText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line))];
+    
+    console.log('Уникальные строки:', lines);
     
     const orders = [];
+    const processedProducts = new Set(); // Для отслеживания уже обработанных продуктов
     
     for (const line of lines) {
         // Ищем количество (число перед кг или шт)
@@ -135,7 +144,15 @@ function parseOrder(orderText) {
         
         // Получаем название продукта (всё до количества)
         const productName = line.substring(0, quantityMatch.index).trim();
-        console.log('Найден продукт:', productName, 'количество:', quantity, unit);
+        const normalizedProductName = normalizeText(productName);
+        
+        // Пропускаем, если этот продукт уже был обработан
+        if (processedProducts.has(normalizedProductName)) {
+            console.log('Пропуск дубликата:', productName);
+            continue;
+        }
+        
+        console.log('Обработка продукта:', productName, 'количество:', quantity, unit);
         
         // Ищем продукт у поставщиков
         const productInfo = findProductInSuppliers(productName);
@@ -151,6 +168,9 @@ function parseOrder(orderText) {
             supplier: productInfo.supplier,
             originalText: line
         });
+        
+        // Добавляем продукт в список обработанных
+        processedProducts.add(normalizedProductName);
     }
     
     console.log('Результат парсинга:', orders);
