@@ -8,11 +8,11 @@ const employees = JSON.parse(readFileSync('./db/employees.json', 'utf-8'));
 function findMatchingSupplier(product, suppliers) {
   const normalizedProduct = product.toLowerCase().trim();
   
-  for (const [supplierName, supplier] of Object.entries(suppliers)) {
+  for (const supplier of suppliers) {
     for (const supplierProduct of supplier.products) {
       if (normalizedProduct.includes(supplierProduct.toLowerCase()) || 
           supplierProduct.toLowerCase().includes(normalizedProduct)) {
-        return supplierName;
+        return supplier.name;
       }
     }
   }
@@ -81,7 +81,8 @@ ${unmatchedItems.map(item => `• ${item}`).join('\n')}
       sender: {
         name: senderName,
         phone: senderPhone
-      }
+      },
+      orderText: matchedItems.join('\n')
     };
 
     // Отправляем сообщение владельцу
@@ -129,7 +130,7 @@ ${order.items.map(item => `• ${item}`).join('\n')}
 \`редактировать\``;
 
     // Отправляем сообщение только Олжасу
-    const olzhasSupplier = suppliers['Олжас'];
+    const olzhasSupplier = suppliers.find(s => s.name === 'Олжас');
     if (olzhasSupplier) {
       await sock.sendMessage(olzhasSupplier.phone + '@s.whatsapp.net', { text: olzhasMsg });
     }
