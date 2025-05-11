@@ -27,7 +27,8 @@ try {
 
       const sock = makeWASocket({
         version,
-        auth: state
+        auth: state,
+        printQRInTerminal: true
       });
 
       sock.ev.on('creds.update', saveCreds);
@@ -141,7 +142,7 @@ _Формат: Название продукта количество_
 
           if (session.step === 2) {
             try {
-              await handleOrder({ from, body: text }, sock);
+              await handleOrder(sock, from, text, session, suppliers, ownerNumber);
               delete sessions[from];
             } catch (error) {
               console.error('Ошибка при обработке заказа:', error);

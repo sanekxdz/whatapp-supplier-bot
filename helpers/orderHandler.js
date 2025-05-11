@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { parseOrder, findProductInSuppliers } from './parseOrder.js';
-import fs from 'fs';
+import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,71 +8,124 @@ const __dirname = path.dirname(__filename);
 
 // Читаем данные о сотрудниках
 const employeesPath = path.join(__dirname, '../db/employees.json');
-const employees = JSON.parse(fs.readFileSync(employeesPath, 'utf8'));
+const employees = JSON.parse(readFileSync(employeesPath, 'utf8'));
 
-// Функция для проверки соответствия продукта
-function findMatchingSupplier(product, suppliers) {
-  console.log('🔍 Поиск поставщика для продукта:', product);
-  
-  const normalizedProduct = product.toLowerCase().trim();
-  console.log('📝 Нормализованное название продукта:', normalizedProduct);
-  
-  for (const supplier of suppliers) {
-    console.log('🔎 Проверка поставщика:', supplier.name);
-    for (const supplierProduct of supplier.products) {
-      const normalizedSupplierProduct = supplierProduct.toLowerCase().trim();
-      console.log('📦 Проверка продукта поставщика:', normalizedSupplierProduct);
-      
-      // Используем функцию isSimilar для более гибкого сравнения
-      if (isSimilar(normalizedProduct, normalizedSupplierProduct)) {
-        console.log('✅ Найден подходящий поставщик:', supplier.name);
-        return supplier.name;
-      }
-    }
-  }
-  console.log('❌ Поставщик не найден для продукта:', product);
-  return null;
-}
-
-// Функция для обработки заказа
-export async function handleOrder(message, client) {
+export async function handleOrder(sock, from, text, session, suppliers, ownerNumber) {
     try {
-        console.log('Начало обработки заказа:', message.body);
+        console.log('📨 Начало обработки заказа');
+        console.log('📝 Текст заказа:', text);
+        console.log('👤 Отправитель:', from);
+        console.log('🏬 Локация:', session.location);
+        console.log('📅 Дата:', session.datetime);
         
-        // Парсим заказ
-        const orders = parseOrder(message.body);
-        if (!orders || orders.length === 0) {
-            console.log('Не удалось распознать заказ');
-            await client.sendMessage(message.from, '❌ Не удалось распознать заказ. Пожалуйста, проверьте формат.');
-            return;
-        }
+        // Получаем информацию об отправителе
+        const senderPhone = from.split('@')[0];
+        const senderName = 'Сотрудник';
+        console.log('📱 Телефон отправителя:', senderPhone);
         
-        // Формируем текст заказа
-        let orderText = '📋 *Новый заказ:*\n\n';
-        for (const order of orders) {
-            orderText += `• ${order.product} - ${order.quantity} ${order.unit}\n`;
-            orderText += `  Поставщик: ${order.supplier.name}\n\n`;
+        // Создаем объект заказа
+        const orderId = uuidv4();
+        const order = {
+            id: orderId,
+            location: session.location,
+            datetime: session.datetime,
+            items: [text],
+            status: 'pending',
+            sender: {
+                name: senderName,
+                phone: senderPhone
+            },
+            orderText: text
+        };
+        console.log('📋 Создан объект заказа:', order);
+
+        // Отправляем сообщение владельцу
+        const ownerMsg = `🆕 *Новый заказ*
+
+📍 *Заведение:* ${order.location}
+📅 *Дата:* ${order.datetime}
+👤 *От:* ${order.sender.name} (${order.sender.phone})
+
+📝 *Заказ:*
+${order.items.map(item => `• ${item}`).join('\n')}
+
+❗️ *Команды для управления заказом:*
+
+✅ *Подтвердить заказ:*
+\`добро\`
+
+❌ *Отменить заказ:*
+\`отказ\`
+
+✏️ *Редактировать заказ:*
+\`редактировать\``;
+
+        console.log('📤 Отправка сообщения владельцу');
+        await sock.sendMessage(ownerNumber, { text: ownerMsg });
+
+        // Отправляем сообщение только Олжасу на подтверждение
+        const olzhasMsg = `🆕 *Новый заказ на подтверждение*
+
+📍 *Заведение:* ${order.location}
+📅 *Дата:* ${order.datetime}
+👤 *От:* ${order.sender.name} (${order.sender.phone})
+
+📝 *Заказ:*
+${order.items.map(item => `• ${item}`).join('\n')}
+
+❗️ *Команды для управления заказом:*
+
+✅ *Подтвердить заказ:*
+\`добро\`
+
+❌ *Отменить заказ:*
+\`отказ\`
+
+✏️ *Редактировать заказ:*
+\`редактировать\``;
+
+        // Отправляем сообщение только Олжасу
+        console.log('🔍 Поиск поставщика Олжас');
+        const olzhasSupplier = suppliers.find(s => s.name === 'Олжас');
+        if (olzhasSupplier) {
+            console.log('📤 Отправка сообщения Олжасу');
+            await sock.sendMessage(olzhasSupplier.phone + '@s.whatsapp.net', { text: olzhasMsg });
+        } else {
+            console.log('⚠️ Поставщик Олжас не найден');
         }
         
         // Отправляем подтверждение отправителю
-        await client.sendMessage(message.from, 
-            '✅ *Ваш заказ принят!*\n\n' + orderText
-        );
-        
-        // Отправляем уведомление владельцу
-        const ownerNumber = '77719119695';
-        await client.sendMessage(ownerNumber, 
-            '🔔 *Новый заказ!*\n\n' + orderText
-        );
-        
-        console.log('Заказ успешно обработан');
-        
-    } catch (error) {
-        console.error('Ошибка при обработке заказа:', error);
-        await client.sendMessage(message.from, '❌ Произошла ошибка при обработке заказа. Пожалуйста, попробуйте позже.');
-    }
-}
+        const confirmationMsg = `✅ *Заказ принят*
 
-module.exports = {
-    handleOrder
-}; 
+Ваш заказ успешно создан и отправлен на подтверждение.
+
+📍 *Заведение:* ${order.location}
+📅 *Дата:* ${order.datetime}
+
+📝 *Заказ:*
+${order.items.map(item => `• ${item}`).join('\n')}
+
+❗️ *Команды для управления заказом:*
+
+❌ *Отменить заказ:*
+\`отказ\`
+
+✏️ *Редактировать заказ:*
+\`редактировать\``;
+
+        console.log('📤 Отправка подтверждения отправителю');
+        await sock.sendMessage(from, { text: confirmationMsg });
+        
+        console.log('✅ Заказ успешно обработан');
+        return { orderId, order };
+    } catch (error) {
+        console.error('❌ Ошибка при обработке заказа:', error);
+        console.error('Stack trace:', error.stack);
+        await sock.sendMessage(from, { 
+            text: `❌ *Ошибка при создании заказа*
+
+Пожалуйста, попробуйте создать заказ еще раз.` 
+        });
+        return { orderId: null, order: null };
+    }
+} 
