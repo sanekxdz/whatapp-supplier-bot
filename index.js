@@ -28,20 +28,31 @@ try {
       const sock = makeWASocket({
         version,
         auth: state,
-        printQRInTerminal: true
+        printQRInTerminal: true,
+        browser: ['WhatsApp Supplier Bot', 'Chrome', '1.0.0']
       });
 
       sock.ev.on('creds.update', saveCreds);
 
       sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
+        console.log('Connection update:', update);
+        
         if (qr) {
           console.log('📱 Новый QR-код сгенерирован');
           qrcode.generate(qr, { small: true });
         }
-        if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-          console.log('🔄 Переподключение к WhatsApp...');
-          startSock();
+        
+        if (connection === 'close') {
+          console.log('Connection closed:', lastDisconnect?.error);
+          if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+            console.log('🔄 Переподключение к WhatsApp...');
+            startSock();
+          }
+        }
+        
+        if (connection === 'open') {
+          console.log('✅ Бот успешно подключен к WhatsApp');
         }
       });
 
@@ -63,9 +74,10 @@ try {
           console.log(`📝 Текст: ${text}`);
 
           const isSupplier = Object.entries(suppliers).some(([_, data]) => data.phone + '@s.whatsapp.net' === from);
+          const isOlzhas = from === '77754723974@s.whatsapp.net';
 
           // Обработка команд администратора
-          if (from === ownerNumber) {
+          if (isOlzhas) {
             const handled = await handleAdminCommand(sock, from, text, pendingOrders, activeOrders, suppliers, ownerNumber);
             if (handled) return;
           }
@@ -83,6 +95,19 @@ try {
           // Обработка редактирования заказа
           const edited = await handleOrderEdit(sock, from, text, activeOrders, pendingOrders, suppliers, ownerNumber);
           if (edited) return;
+
+          // Если это Олжас, не позволяем создавать новый заказ
+          if (isOlzhas) {
+            await sock.sendMessage(from, { 
+              text: `❌ *Ошибка*
+
+Вы не можете создавать новые заказы. Вы можете только:
+• Одобрять заказы
+• Отклонять заказы
+• Редактировать заказы` 
+            });
+            return;
+          }
 
           // Обработка нового заказа
           if (!sessions[from]) {
