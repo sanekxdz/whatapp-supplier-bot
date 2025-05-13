@@ -29,6 +29,28 @@ function isProductInDatabase(productName) {
     return false;
 }
 
+// Функция для распределения продуктов по поставщикам
+function distributeProductsBySupplier(products) {
+    const distribution = new Map();
+    
+    for (const product of products) {
+        for (const supplier of suppliers) {
+            for (const supplierProduct of supplier.products) {
+                if (supplierProduct.toLowerCase().includes(product.toLowerCase()) || 
+                    product.toLowerCase().includes(supplierProduct.toLowerCase())) {
+                    if (!distribution.has(supplier.name)) {
+                        distribution.set(supplier.name, []);
+                    }
+                    distribution.get(supplier.name).push(product);
+                    break;
+                }
+            }
+        }
+    }
+    
+    return distribution;
+}
+
 export async function handleOrder(sock, from, text, session, suppliers, ownerNumber) {
     try {
         console.log('📨 Начало обработки заказа');
@@ -56,6 +78,9 @@ export async function handleOrder(sock, from, text, session, suppliers, ownerNum
                 unknownProducts.push(item);
             }
         }
+        
+        // Распределяем известные продукты по поставщикам
+        const productDistribution = distributeProductsBySupplier(knownProducts);
         
         // Создаем объект заказа
         const orderId = uuidv4();
@@ -144,7 +169,7 @@ ${unknownProducts.map(item => `• ${item}`).join('\n')}
             console.log('⚠️ Поставщик Олжас не найден');
         }
         
-        // Отправляем подтверждение отправителю
+        // Отправляем подтверждение отправителю с распределением по поставщикам
         let confirmationMsg = `✅ *Заказ принят*
 
 Ваш заказ успешно создан и отправлен на подтверждение.
@@ -152,10 +177,15 @@ ${unknownProducts.map(item => `• ${item}`).join('\n')}
 📍 *Заведение:* ${order.location}
 📅 *Дата:* ${order.datetime}
 
-📝 *Заказ:*
-${knownProducts.map(item => `• ${item}`).join('\n')}
+📝 *Распределение заказа по поставщикам:*`;
 
-❗️ *Команды для управления заказом:*
+        // Добавляем информацию о распределении продуктов
+        for (const [supplier, products] of productDistribution) {
+            confirmationMsg += `\n\n*${supplier}:*
+${products.map(item => `• ${item}`).join('\n')}`;
+        }
+
+        confirmationMsg += `\n\n❗️ *Команды для управления заказом:*
 
 ❌ *Отменить заказ:*
 \`отказ\`
