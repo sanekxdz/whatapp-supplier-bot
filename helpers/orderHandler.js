@@ -29,11 +29,32 @@ function isProductInDatabase(productName) {
     return false;
 }
 
+// Функция для разбиения заказа на продукты
+function splitOrderIntoProducts(orderText) {
+    // Разбиваем по запятым, "и" и пробелам
+    return orderText
+        .split(/[,и]/)
+        .map(item => item.trim())
+        .filter(item => item)
+        .map(item => {
+            // Ищем количество (число перед кг или шт)
+            const quantityMatch = item.match(/(\d+)\s*(кг|шт)/i);
+            if (quantityMatch) {
+                const quantity = quantityMatch[1];
+                const unit = quantityMatch[2].toLowerCase();
+                const productName = item.substring(0, quantityMatch.index).trim();
+                return `${productName} ${quantity} ${unit}`;
+            }
+            return item;
+        });
+}
+
 // Функция для распределения продуктов по поставщикам
 function distributeProductsBySupplier(products) {
     const distribution = new Map();
     
     for (const product of products) {
+        let found = false;
         for (const supplier of suppliers) {
             for (const supplierProduct of supplier.products) {
                 if (supplierProduct.toLowerCase().includes(product.toLowerCase()) || 
@@ -42,9 +63,11 @@ function distributeProductsBySupplier(products) {
                         distribution.set(supplier.name, []);
                     }
                     distribution.get(supplier.name).push(product);
+                    found = true;
                     break;
                 }
             }
+            if (found) break;
         }
     }
     
@@ -65,7 +88,8 @@ export async function handleOrder(sock, from, text, session, suppliers, ownerNum
         console.log('📱 Телефон отправителя:', senderPhone);
         
         // Разбиваем заказ на отдельные продукты
-        const orderItems = text.split(/[,и]/).map(item => item.trim()).filter(item => item);
+        const orderItems = splitOrderIntoProducts(text);
+        console.log('📦 Разбитые продукты:', orderItems);
         
         // Разделяем продукты на известные и неизвестные
         const knownProducts = [];
@@ -79,8 +103,12 @@ export async function handleOrder(sock, from, text, session, suppliers, ownerNum
             }
         }
         
+        console.log('✅ Известные продукты:', knownProducts);
+        console.log('❌ Неизвестные продукты:', unknownProducts);
+        
         // Распределяем известные продукты по поставщикам
         const productDistribution = distributeProductsBySupplier(knownProducts);
+        console.log('📊 Распределение по поставщикам:', Object.fromEntries(productDistribution));
         
         // Создаем объект заказа
         const orderId = uuidv4();
