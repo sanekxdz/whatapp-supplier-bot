@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { parseOrder } from './parseOrder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +10,24 @@ const __dirname = path.dirname(__filename);
 // Читаем данные о сотрудниках
 const employeesPath = path.join(__dirname, '../db/employees.json');
 const employees = JSON.parse(readFileSync(employeesPath, 'utf8'));
+
+// Читаем данные о поставщиках
+const suppliersPath = path.join(__dirname, '../db/suppliers.json');
+const suppliers = JSON.parse(readFileSync(suppliersPath, 'utf8'));
+
+// Функция для проверки, есть ли продукт в базе данных
+function isProductInDatabase(productName) {
+    const normalizedProduct = productName.toLowerCase().trim();
+    for (const supplier of suppliers) {
+        for (const supplierProduct of supplier.products) {
+            if (supplierProduct.toLowerCase().includes(normalizedProduct) || 
+                normalizedProduct.includes(supplierProduct.toLowerCase())) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 export async function handleOrder(sock, from, text, session, suppliers, ownerNumber) {
     try {
@@ -23,13 +42,29 @@ export async function handleOrder(sock, from, text, session, suppliers, ownerNum
         const senderName = 'Сотрудник';
         console.log('📱 Телефон отправителя:', senderPhone);
         
+        // Разбиваем заказ на отдельные продукты
+        const orderItems = text.split(/[,и]/).map(item => item.trim()).filter(item => item);
+        
+        // Разделяем продукты на известные и неизвестные
+        const knownProducts = [];
+        const unknownProducts = [];
+        
+        for (const item of orderItems) {
+            if (isProductInDatabase(item)) {
+                knownProducts.push(item);
+            } else {
+                unknownProducts.push(item);
+            }
+        }
+        
         // Создаем объект заказа
         const orderId = uuidv4();
         const order = {
             id: orderId,
             location: session.location,
             datetime: session.datetime,
-            items: [text],
+            items: knownProducts,
+            unknownItems: unknownProducts,
             status: 'pending',
             sender: {
                 name: senderName,
@@ -40,16 +75,24 @@ export async function handleOrder(sock, from, text, session, suppliers, ownerNum
         console.log('📋 Создан объект заказа:', order);
 
         // Отправляем сообщение владельцу
-        const ownerMsg = `🆕 *Новый заказ*
+        let ownerMsg = `🆕 *Новый заказ*
 
 📍 *Заведение:* ${order.location}
 📅 *Дата:* ${order.datetime}
 👤 *От:* ${order.sender.name} (${order.sender.phone})
 
 📝 *Заказ:*
-${order.items.map(item => `• ${item}`).join('\n')}
+${knownProducts.map(item => `• ${item}`).join('\n')}`;
 
-❗️ *Команды для управления заказом:*
+        // Если есть неизвестные продукты, добавляем их в отдельный список
+        if (unknownProducts.length > 0) {
+            ownerMsg += `\n\n⚠️ *Продукты, которых нет в базе данных:*
+${unknownProducts.map(item => `• ${item}`).join('\n')}
+
+❗️ *Пожалуйста, проверьте эти продукты и добавьте их в базу данных, если они должны быть доступны.*`;
+        }
+
+        ownerMsg += `\n\n❗️ *Команды для управления заказом:*
 
 ✅ *Подтвердить заказ:*
 \`добро\`
@@ -71,9 +114,16 @@ ${order.items.map(item => `• ${item}`).join('\n')}
 👤 *От:* ${order.sender.name} (${order.sender.phone})
 
 📝 *Заказ:*
-${order.items.map(item => `• ${item}`).join('\n')}
+${knownProducts.map(item => `• ${item}`).join('\n')}`;
 
-❗️ *Команды для управления заказом:*
+        if (unknownProducts.length > 0) {
+            olzhasMsg += `\n\n⚠️ *Продукты, которых нет в базе данных:*
+${unknownProducts.map(item => `• ${item}`).join('\n')}
+
+❗️ *Пожалуйста, проверьте эти продукты и добавьте их в базу данных, если они должны быть доступны.*`;
+        }
+
+        olzhasMsg += `\n\n❗️ *Команды для управления заказом:*
 
 ✅ *Подтвердить заказ:*
 \`добро\`
@@ -95,7 +145,7 @@ ${order.items.map(item => `• ${item}`).join('\n')}
         }
         
         // Отправляем подтверждение отправителю
-        const confirmationMsg = `✅ *Заказ принят*
+        let confirmationMsg = `✅ *Заказ принят*
 
 Ваш заказ успешно создан и отправлен на подтверждение.
 
@@ -103,7 +153,7 @@ ${order.items.map(item => `• ${item}`).join('\n')}
 📅 *Дата:* ${order.datetime}
 
 📝 *Заказ:*
-${order.items.map(item => `• ${item}`).join('\n')}
+${knownProducts.map(item => `• ${item}`).join('\n')}
 
 ❗️ *Команды для управления заказом:*
 
